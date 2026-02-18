@@ -51,16 +51,11 @@ struct TerminalService {
         launchTerminal(shellCommand: cmd, using: terminal, customAppPath: customPath)
     }
 
-    /// Open an SFTP connection in the system's preferred SFTP app via URL scheme
+    /// Open an SFTP connection in the system's preferred SFTP app via URL scheme.
+    /// Uses the SSH config alias (host.host) so apps like Transmit can match it
+    /// against ~/.ssh/config and inherit identity files, proxy settings, etc.
     static func openSFTP(to host: SSHHost) {
-        let userPart = host.user.isEmpty ? "" : "\(host.user)@"
-        let portPart: String
-        if let port = host.port, port != Self.defaultSSHPort {
-            portPart = ":\(port)"
-        } else {
-            portPart = ""
-        }
-        guard let url = URL(string: "sftp://\(userPart)\(host.hostName)\(portPart)") else {
+        guard let url = URL(string: "sftp://\(host.host)") else {
             logger.warning("Failed to build SFTP URL for \(host.displayName)")
             return
         }

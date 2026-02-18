@@ -28,7 +28,9 @@ cp "$PROJECT_DIR/build/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 echo "==> Code signing (ad-hoc)..."
 codesign --force --deep --sign - "$APP_DIR"
 
-DMG_PATH="$PROJECT_DIR/build/SSHMan.dmg"
+# Extract version from Info.plist for DMG filename
+VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP_DIR/Contents/Info.plist")
+DMG_PATH="$PROJECT_DIR/build/SSHMan-v${VERSION}.dmg"
 DMG_RW="$PROJECT_DIR/build/SSHMan-rw.dmg"
 DMG_MOUNT="/tmp/sshman-dmg-$$"
 echo "==> Creating DMG..."
@@ -43,7 +45,7 @@ ln -s /Applications "$DMG_MOUNT/Applications"
 
 # Style the DMG Finder window with large icons and drag-to-install layout
 echo "==> Styling DMG window..."
-osascript - "$DMG_MOUNT" <<'APPLESCRIPT'
+osascript - "$DMG_MOUNT" <<'APPLESCRIPT' || echo "  (Finder styling skipped — AppleEvent timeout)"
 on run argv
     set mountPath to POSIX file (item 1 of argv) as alias
     tell application "Finder"

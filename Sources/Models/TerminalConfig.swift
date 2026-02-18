@@ -47,6 +47,7 @@ final class TerminalPreferences: ObservableObject {
 
     @AppStorage("defaultTerminal") var defaultTerminal: TerminalApp = .ghostty
     @AppStorage("customTerminalPath") var customTerminalPath: String = ""
+    @AppStorage("maskHostIP") var maskHostIP: Bool = false
 
     @Published var hostOverrides: [String: HostTerminalOverride] = [:]
 

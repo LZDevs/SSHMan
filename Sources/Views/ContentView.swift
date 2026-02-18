@@ -12,7 +12,9 @@ struct ContentView: View {
     @State private var editingHost: SSHHost?
     @State private var showingAddHost = false
     @State private var searchText = ""
+    @State private var addHostGroupID: UUID?
     @State private var showingImport = false
+    @State private var importGroupID: UUID?
     @State private var showingExport = false
     @State private var showingTermiusImport = false
     @State private var showingAbout = false
@@ -56,7 +58,17 @@ struct ContentView: View {
             VStack(spacing: 6) {
                 Rectangle().fill(t.secondary.opacity(0.15)).frame(width: 24, height: 0.5)
                 Menu {
-                    Button { showingImport = true } label: { Label("Import Config...", systemImage: "square.and.arrow.down") }
+                    if configService.groups.isEmpty {
+                        Button { importGroupID = nil; showingImport = true } label: { Label("Import Config...", systemImage: "square.and.arrow.down") }
+                    } else {
+                        Menu {
+                            Button { importGroupID = nil; showingImport = true } label: { Text("No Group") }
+                            Divider()
+                            ForEach(configService.groups) { group in
+                                Button { importGroupID = group.id; showingImport = true } label: { Text(group.name) }
+                            }
+                        } label: { Label("Import Config...", systemImage: "square.and.arrow.down") }
+                    }
                     Button { showingTermiusImport = true } label: { Label("Import from Termius...", systemImage: "link") }
                     Button { exportDocument = SSHConfigDocument(content: configService.exportConfig()); showingExport = true } label: { Label("Export Config...", systemImage: "square.and.arrow.up") }
                     Divider()
@@ -103,7 +115,7 @@ struct ContentView: View {
     private var centerPanel: some View {
         switch selectedNav {
         case .hosts:
-            SidebarView(searchText: $searchText, showingAddHost: $showingAddHost,
+            SidebarView(searchText: $searchText, showingAddHost: $showingAddHost, addHostGroupID: $addHostGroupID,
                          onEdit: { showingAddHost = false; editingHost = $0 },
                          onConnect: { TerminalService.connect(to: $0) })
         case .keys: KeyManagementView(isInline: true)
@@ -115,14 +127,39 @@ struct ContentView: View {
     private var rightPanel: some View {
         Group {
             if showingAddHost {
-                HostFormView(mode: .add) { configService.addHost($0); showingAddHost = false }
-                    onCancel: { showingAddHost = false }
+                HostFormView(mode: .add, groups: configService.groups, initialGroupID: addHostGroupID) { host, groupID in
+                    configService.addHost(host)
+                    assignHost(host, toGroup: groupID)
+                    addHostGroupID = nil
+                    showingAddHost = false
+                } onCancel: {
+                    addHostGroupID = nil
+                    showingAddHost = false
+                }
             } else if let host = editingHost {
-                HostFormView(mode: .edit(host)) { configService.updateHost($0); editingHost = nil }
-                    onCancel: { editingHost = nil }
+                let currentGroupID = configService.groups.first { $0.hostIDs.contains(host.host) }?.id
+                HostFormView(mode: .edit(host), groups: configService.groups, initialGroupID: currentGroupID) { updatedHost, groupID in
+                    configService.updateHost(updatedHost)
+                    assignHost(updatedHost, toGroup: groupID)
+                    editingHost = nil
+                } onCancel: {
+                    editingHost = nil
+                }
             }
         }
         .background(t.background)
+    }
+
+    private func assignHost(_ host: SSHHost, toGroup groupID: UUID?) {
+        // Remove from all groups first
+        for i in configService.groups.indices {
+            configService.groups[i].hostIDs.removeAll { $0 == host.host }
+        }
+        // Add to selected group if any
+        if let groupID, let idx = configService.groups.firstIndex(where: { $0.id == groupID }) {
+            configService.groups[idx].hostIDs.append(host.host)
+        }
+        configService.saveGroups()
     }
 
     private func handleImport(_ result: Result<[URL], Error>) {
@@ -130,7 +167,19 @@ struct ContentView: View {
         guard url.startAccessingSecurityScopedResource() else { return }
         defer { url.stopAccessingSecurityScopedResource() }
         if let content = try? String(contentsOf: url, encoding: .utf8) {
+            let existingAliases = Set(configService.hosts.map { $0.host })
             configService.importConfig(from: content, replace: false)
+            // Assign newly imported hosts to selected group
+            if let groupID = importGroupID,
+               let idx = configService.groups.firstIndex(where: { $0.id == groupID }) {
+                for host in configService.hosts where !existingAliases.contains(host.host) {
+                    if !configService.groups[idx].hostIDs.contains(host.host) {
+                        configService.groups[idx].hostIDs.append(host.host)
+                    }
+                }
+                configService.saveGroups()
+            }
+            importGroupID = nil
         }
     }
 }

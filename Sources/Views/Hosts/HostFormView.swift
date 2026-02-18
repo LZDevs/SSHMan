@@ -7,7 +7,8 @@ struct HostFormView: View {
     }
 
     let mode: Mode
-    let onSave: (SSHHost) -> Void
+    let groups: [HostGroup]
+    let onSave: (SSHHost, UUID?) -> Void
     var onCancel: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
@@ -20,23 +21,29 @@ struct HostFormView: View {
     @State private var identityFile: String = ""
     @State private var proxyJump: String = ""
     @State private var sftpPath: String = ""
+    @State private var sshInitPath: Bool = true
     @State private var forwardAgent: Bool = false
     @State private var selectedIcon: String = ""
+    @State private var showIconPicker: Bool = false
     @State private var comment: String = ""
     @State private var extraOptionsText: String = ""
     @State private var availableKeys: [SSHKeyInfo] = []
     @State private var useDefaultTerminal: Bool = true
     @State private var selectedTerminal: TerminalApp = .ghostty
     @State private var customTerminalPath: String = ""
+    @State private var selectedGroupID: UUID?
 
     private let terminalPrefs = TerminalPreferences.shared
     private var t: AppTheme { tm.current }
     private var existingID: UUID?
 
-    init(mode: Mode, onSave: @escaping (SSHHost) -> Void, onCancel: (() -> Void)? = nil) {
+    init(mode: Mode, groups: [HostGroup] = [], initialGroupID: UUID? = nil, onSave: @escaping (SSHHost, UUID?) -> Void, onCancel: (() -> Void)? = nil) {
         self.mode = mode
+        self.groups = groups
         self.onSave = onSave
         self.onCancel = onCancel
+
+        _selectedGroupID = State(initialValue: initialGroupID)
 
         switch mode {
         case .add:
@@ -50,6 +57,7 @@ struct HostFormView: View {
             _identityFile = State(initialValue: existing.identityFile)
             _proxyJump = State(initialValue: existing.proxyJump)
             _sftpPath = State(initialValue: existing.sftpPath)
+            _sshInitPath = State(initialValue: existing.sshInitPath)
             _forwardAgent = State(initialValue: existing.forwardAgent)
             _selectedIcon = State(initialValue: existing.icon)
             _comment = State(initialValue: existing.comment)
@@ -87,44 +95,54 @@ struct HostFormView: View {
             // Title bar
             HStack {
                 Text(title)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(t.foreground)
                 Spacer()
                 Button("Cancel") { cancelAction() }
                     .keyboardShortcut(.cancelAction)
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
 
-            Divider()
+            Rectangle().fill(t.secondary.opacity(0.2)).frame(height: 0.5)
 
+            ScrollViewReader { scrollProxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 16) {
                     // Connection
-                    sectionHeader("Connection")
-                    VStack(spacing: 10) {
+                    formSection("CONNECTION") {
                         labeledField("Name", text: $name, prompt: "e.g., My Server")
                         labeledField("HostName", text: $hostName, prompt: "IP address or domain")
                         labeledField("User", text: $user, prompt: "Username")
                         labeledField("Port", text: $portString, prompt: "22")
+                        if !groups.isEmpty {
+                            HStack {
+                                Text("Group")
+                                    .font(.system(size: 12))
+                                    .frame(width: 120, alignment: .trailing)
+                                    .foregroundColor(t.secondary)
+                                Picker("", selection: $selectedGroupID) {
+                                    Text("None").tag(UUID?.none)
+                                    ForEach(groups) { group in
+                                        Text(group.name).tag(UUID?.some(group.id))
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                            }
+                        }
                     }
 
-                    Divider()
-
-                    // Appearance
-                    sectionHeader("Appearance")
-                    iconPicker
-
-                    Divider()
-
-                    // Authentication
-                    sectionHeader("Authentication")
-                    VStack(spacing: 10) {
+                    // Authentication (merged with Proxy)
+                    formSection("AUTHENTICATION") {
                         HStack {
                             Text("Identity File")
+                                .font(.system(size: 12))
                                 .frame(width: 120, alignment: .trailing)
                                 .foregroundColor(t.secondary)
                             TextField("~/.ssh/id_ed25519", text: $identityFile)
                                 .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 12))
                             Menu {
                                 if availableKeys.isEmpty {
                                     Text("No keys found")
@@ -150,33 +168,40 @@ struct HostFormView: View {
                         }
                         HStack {
                             Text("Forward Agent")
+                                .font(.system(size: 12))
                                 .frame(width: 120, alignment: .trailing)
                                 .foregroundColor(t.secondary)
                             Toggle("", isOn: $forwardAgent)
                                 .labelsHidden()
                             Spacer()
                         }
+                        labeledField("ProxyJump", text: $proxyJump, prompt: "e.g., bastion")
                     }
 
-                    Divider()
-
-                    // Proxy
-                    sectionHeader("Proxy")
-                    labeledField("ProxyJump", text: $proxyJump, prompt: "e.g., bastion")
-
-                    Divider()
-
-                    // SFTP
-                    sectionHeader("SFTP")
-                    labeledField("Initial Path", text: $sftpPath, prompt: "e.g., /var/www")
-
-                    Divider()
+                    // Paths
+                    formSection("PATHS") {
+                        labeledField("Initial Path", text: $sftpPath, prompt: "e.g., /var/www")
+                        if !sftpPath.trimmingCharacters(in: .whitespaces).isEmpty {
+                            HStack {
+                                Text("SSH cd")
+                                    .font(.system(size: 12))
+                                    .frame(width: 120, alignment: .trailing)
+                                    .foregroundColor(t.secondary)
+                                Toggle("", isOn: $sshInitPath)
+                                    .labelsHidden()
+                                Text("cd into this path on SSH connect")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(t.secondary)
+                                Spacer()
+                            }
+                        }
+                    }
 
                     // Terminal
-                    sectionHeader("Terminal")
-                    VStack(spacing: 10) {
+                    formSection("TERMINAL") {
                         HStack {
                             Text("Terminal")
+                                .font(.system(size: 12))
                                 .frame(width: 120, alignment: .trailing)
                                 .foregroundColor(t.secondary)
                             Picker("", selection: $useDefaultTerminal) {
@@ -192,6 +217,7 @@ struct HostFormView: View {
                         if !useDefaultTerminal {
                             HStack {
                                 Text("App")
+                                    .font(.system(size: 12))
                                     .frame(width: 120, alignment: .trailing)
                                     .foregroundColor(t.secondary)
                                 Picker("", selection: $selectedTerminal) {
@@ -206,42 +232,80 @@ struct HostFormView: View {
                             if selectedTerminal == .custom {
                                 HStack {
                                     Text("App Path")
+                                        .font(.system(size: 12))
                                         .frame(width: 120, alignment: .trailing)
                                         .foregroundColor(t.secondary)
                                     TextField("/Applications/MyTerm.app", text: $customTerminalPath)
                                         .textFieldStyle(.roundedBorder)
+                                        .font(.system(size: 12))
                                 }
                             }
                         }
                     }
 
-                    Divider()
-
-                    // Extra Options
-                    sectionHeader("Additional Options")
-                    HStack(alignment: .top) {
-                        Text("Options")
-                            .frame(width: 120, alignment: .trailing)
-                            .foregroundColor(t.secondary)
-                        TextEditor(text: $extraOptionsText)
-                            .font(.system(.body, design: .monospaced))
-                            .frame(minHeight: 50, maxHeight: 80)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .stroke(t.secondary.opacity(0.3))
-                            )
+                    // Advanced (merged Extra Options + Comment)
+                    formSection("ADVANCED") {
+                        HStack(alignment: .top) {
+                            Text("Options")
+                                .font(.system(size: 12))
+                                .frame(width: 120, alignment: .trailing)
+                                .foregroundColor(t.secondary)
+                            TextEditor(text: $extraOptionsText)
+                                .font(.system(.body, design: .monospaced))
+                                .frame(minHeight: 50, maxHeight: 80)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(t.secondary.opacity(0.3))
+                                )
+                        }
+                        labeledField("Comment", text: $comment, prompt: "Optional note")
                     }
 
-                    Divider()
+                    // Icon (collapsible)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showIconPicker.toggle()
+                            }
+                            if showIconPicker {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                    withAnimation {
+                                        scrollProxy.scrollTo("iconPickerBottom", anchor: .bottom)
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: showIconPicker ? "chevron.down" : "chevron.right")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(t.secondary)
+                                    .frame(width: 12)
+                                sectionHeader("ICON")
+                                if !selectedIcon.isEmpty {
+                                    Image(systemName: selectedIcon)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(t.accent)
+                                }
+                                Spacer()
+                            }
+                        }
+                        .buttonStyle(.plain)
 
-                    // Comment
-                    sectionHeader("Comment")
-                    labeledField("Comment", text: $comment, prompt: "Optional note")
+                        if showIconPicker {
+                            iconPicker
+                                .padding(12)
+                                .background(RoundedRectangle(cornerRadius: 9).fill(t.surface.opacity(0.6)))
+                                .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(t.secondary.opacity(0.15), lineWidth: 0.5))
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                                .id("iconPickerBottom")
+                        }
+                    }
                 }
-                .padding(24)
+                .padding(16)
+            }
             }
 
-            Divider()
+            Rectangle().fill(t.secondary.opacity(0.2)).frame(height: 0.5)
 
             // Action buttons
             HStack {
@@ -253,7 +317,8 @@ struct HostFormView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(!isValid)
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
         .task {
             availableKeys = SSHKeyService.shared.listKeys()
@@ -268,21 +333,41 @@ struct HostFormView: View {
         }
     }
 
+    // MARK: - Helpers
+
     private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.subheadline)
-            .fontWeight(.semibold)
-            .foregroundColor(t.secondary)
-            .textCase(.uppercase)
+        HStack(spacing: 6) {
+            Text(title)
+                .font(.system(size: 10.5, weight: .bold))
+                .foregroundColor(t.secondary)
+                .tracking(0.6)
+            Rectangle()
+                .fill(t.secondary.opacity(0.2))
+                .frame(height: 0.5)
+        }
+    }
+
+    private func formSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(title)
+            VStack(spacing: 10) {
+                content()
+            }
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 9).fill(t.surface.opacity(0.6)))
+            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(t.secondary.opacity(0.15), lineWidth: 0.5))
+        }
     }
 
     private func labeledField(_ label: String, text: Binding<String>, prompt: String) -> some View {
         HStack {
             Text(label)
+                .font(.system(size: 12))
                 .frame(width: 120, alignment: .trailing)
                 .foregroundColor(t.secondary)
             TextField(prompt, text: text)
                 .textFieldStyle(.roundedBorder)
+                .font(.system(size: 12))
         }
     }
 
@@ -377,6 +462,7 @@ struct HostFormView: View {
             forwardAgent: forwardAgent,
             icon: selectedIcon,
             sftpPath: sftpPath.trimmingCharacters(in: .whitespaces),
+            sshInitPath: sshInitPath,
             extraOptions: extras,
             comment: formattedComment
         )
@@ -393,7 +479,7 @@ struct HostFormView: View {
             )
         }
 
-        onSave(newHost)
+        onSave(newHost, selectedGroupID)
         if onCancel == nil {
             dismiss()
         }

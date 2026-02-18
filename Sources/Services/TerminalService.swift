@@ -46,6 +46,10 @@ struct TerminalService {
         }
         cmd += " \(shellEscape(target))"
 
+        if host.sshInitPath && !host.sftpPath.isEmpty {
+            cmd += " -t \(shellEscape("cd \(host.sftpPath) && exec $SHELL -l"))"
+        }
+
         let terminal = prefs.resolvedTerminal(for: host.host)
         let customPath = prefs.resolvedCustomPath(for: host.host)
         launchTerminal(shellCommand: cmd, using: terminal, customAppPath: customPath)

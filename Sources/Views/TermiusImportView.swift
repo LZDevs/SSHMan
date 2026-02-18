@@ -8,6 +8,7 @@ struct TermiusImportView: View {
     @State private var linkText = ""
     @State private var importedCount = 0
     @State private var didImport = false
+    @State private var selectedGroupID: UUID?
 
     private var t: AppTheme { tm.current }
 
@@ -38,6 +39,22 @@ struct TermiusImportView: View {
                         RoundedRectangle(cornerRadius: 6)
                             .stroke(t.secondary.opacity(0.3))
                     )
+
+                if !configService.groups.isEmpty {
+                    HStack {
+                        Text("Add to group:")
+                            .font(.subheadline)
+                            .foregroundColor(t.secondary)
+                        Picker("", selection: $selectedGroupID) {
+                            Text("None").tag(UUID?.none)
+                            ForEach(configService.groups) { group in
+                                Text(group.name).tag(UUID?.some(group.id))
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                    }
+                }
 
                 if didImport {
                     HStack(spacing: 6) {
@@ -93,14 +110,27 @@ struct TermiusImportView: View {
     private func performImport() {
         let lines = linkText.components(separatedBy: .newlines)
         var count = 0
+        var importedAliases: [String] = []
 
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }
             if let host = parseTermiusLink(trimmed) {
                 configService.addHost(host)
+                importedAliases.append(host.host)
                 count += 1
             }
+        }
+
+        // Assign imported hosts to selected group
+        if let groupID = selectedGroupID,
+           let idx = configService.groups.firstIndex(where: { $0.id == groupID }) {
+            for alias in importedAliases {
+                if !configService.groups[idx].hostIDs.contains(alias) {
+                    configService.groups[idx].hostIDs.append(alias)
+                }
+            }
+            configService.saveGroups()
         }
 
         importedCount = count

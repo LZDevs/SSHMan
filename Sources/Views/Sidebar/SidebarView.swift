@@ -5,6 +5,7 @@ struct SidebarView: View {
     @ObservedObject private var tm = ThemeManager.shared
     @Binding var searchText: String
     @Binding var showingAddHost: Bool
+    @Binding var addHostGroupID: UUID?
     var onEdit: ((SSHHost) -> Void)?
     var onConnect: ((SSHHost) -> Void)?
 
@@ -47,7 +48,6 @@ struct SidebarView: View {
                     } else {
                         if !configService.groups.isEmpty { groupedSections }
                         ungroupedSection
-                        if searchText.isEmpty { addHostSection }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -101,24 +101,39 @@ struct SidebarView: View {
     // MARK: - Search Bar
 
     private var searchBar: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(t.secondary)
-                .font(.system(size: 12, weight: .medium))
-            TextField("Search hosts...", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 12.5))
-                .foregroundColor(t.foreground)
-            if !searchText.isEmpty {
-                Button { searchText = "" } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(t.secondary).font(.system(size: 11))
-                }.buttonStyle(.plain)
+        HStack(spacing: 8) {
+            Button { showingAddHost = true } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(t.accent.opacity(0.15))
+                        .frame(width: 30, height: 30)
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(t.accent)
+                }
             }
+            .buttonStyle(.plain)
+            .help("Add Host")
+
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(t.secondary)
+                    .font(.system(size: 12, weight: .medium))
+                TextField("Search hosts...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12.5))
+                    .foregroundColor(t.foreground)
+                if !searchText.isEmpty {
+                    Button { searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(t.secondary).font(.system(size: 11))
+                    }.buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background(RoundedRectangle(cornerRadius: 7).fill(t.surface.opacity(0.5)))
+            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(t.secondary.opacity(0.2), lineWidth: 0.5))
         }
-        .padding(.horizontal, 10).padding(.vertical, 7)
-        .background(RoundedRectangle(cornerRadius: 7).fill(t.surface.opacity(0.5)))
-        .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(t.secondary.opacity(0.2), lineWidth: 0.5))
     }
 
     private var emptySearchState: some View {
@@ -140,7 +155,7 @@ struct SidebarView: View {
             let groupHosts = filteredHosts.filter { group.hostIDs.contains($0.host) }
             if !groupHosts.isEmpty || searchText.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    sectionHeader(group.name)
+                    sectionHeader(group.name, group: group)
                         .contentShape(Rectangle())
                         .dropDestination(for: String.self) { a, _ in dropHosts(a, into: group) }
                     LazyVGrid(columns: columns, spacing: 8) {
@@ -175,19 +190,20 @@ struct SidebarView: View {
         }
     }
 
-    private var addHostSection: some View {
-        LazyVGrid(columns: columns, spacing: 8) { AddHostTile { showingAddHost = true } }
-    }
-
-    private func sectionHeader(_ title: String) -> some View {
+    private func sectionHeader(_ title: String, group: HostGroup? = nil) -> some View {
         HStack(spacing: 6) {
             Text(title.uppercased())
                 .font(.system(size: 10.5, weight: .bold)).foregroundColor(t.secondary).tracking(0.6)
             Rectangle().fill(t.secondary.opacity(0.2)).frame(height: 0.5)
-            Button { showingAddGroup = true } label: {
-                Image(systemName: "folder.badge.plus")
-                    .font(.system(size: 10, weight: .medium)).foregroundColor(t.secondary)
-            }.buttonStyle(.plain).help("New group")
+            if let group {
+                Button {
+                    addHostGroupID = group.id
+                    showingAddHost = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 10, weight: .medium)).foregroundColor(t.secondary)
+                }.buttonStyle(.plain).help("Add host to \(group.name)")
+            }
         }.padding(.horizontal, 2)
     }
 

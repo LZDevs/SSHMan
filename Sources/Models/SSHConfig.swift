@@ -50,6 +50,8 @@ struct SSHConfig {
                         currentHost?.icon = String(line.dropFirst("# @icon ".count))
                     } else if line.hasPrefix("# @sftppath ") {
                         currentHost?.sftpPath = String(line.dropFirst("# @sftppath ".count))
+                    } else if line.hasPrefix("# @sshinitpath ") {
+                        currentHost?.sshInitPath = String(line.dropFirst("# @sshinitpath ".count)) != "no"
                     } else {
                         userComments.append(line)
                     }
@@ -174,6 +176,9 @@ struct SSHConfig {
             }
             if !host.sftpPath.isEmpty {
                 lines.append("# @sftppath \(host.sftpPath)")
+                if !host.sshInitPath {
+                    lines.append("# @sshinitpath no")
+                }
             }
 
             // Write comment if present

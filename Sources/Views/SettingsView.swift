@@ -35,6 +35,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     themeSection
+                    displaySection
                     terminalSection
                     availabilitySection
                 }
@@ -110,6 +111,24 @@ struct SettingsView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Display Section
+
+    private var displaySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("DISPLAY")
+
+            VStack(spacing: 8) {
+                Toggle("Mask IP / hostname on host tiles", isOn: $prefs.maskHostIP)
+                    .font(.system(size: 12))
+                    .foregroundColor(t.foreground)
+                    .toggleStyle(.switch)
+            }
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 9).fill(t.surface.opacity(0.6)))
+            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(t.secondary.opacity(0.15), lineWidth: 0.5))
+        }
     }
 
     // MARK: - Terminal Section

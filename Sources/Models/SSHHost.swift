@@ -12,6 +12,7 @@ struct SSHHost: Identifiable, Codable, Hashable {
     var forwardAgent: Bool
     var icon: String
     var sftpPath: String
+    var sshInitPath: Bool
     var extraOptions: [String: String]
     var comment: String
 
@@ -27,6 +28,7 @@ struct SSHHost: Identifiable, Codable, Hashable {
         forwardAgent: Bool = false,
         icon: String = "",
         sftpPath: String = "",
+        sshInitPath: Bool = true,
         extraOptions: [String: String] = [:],
         comment: String = ""
     ) {
@@ -41,6 +43,7 @@ struct SSHHost: Identifiable, Codable, Hashable {
         self.forwardAgent = forwardAgent
         self.icon = icon
         self.sftpPath = sftpPath
+        self.sshInitPath = sshInitPath
         self.extraOptions = extraOptions
         self.comment = comment
     }

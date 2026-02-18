@@ -6,6 +6,7 @@ struct HostRowView: View {
     var onConnect: (() -> Void)?
 
     @ObservedObject private var tm = ThemeManager.shared
+    @ObservedObject private var prefs = TerminalPreferences.shared
     @State private var isHovered = false
     private var t: AppTheme { tm.current }
 
@@ -91,63 +92,16 @@ struct HostRowView: View {
     }
 
     private var connectionString: String {
+        let displayHost = prefs.maskHostIP ? "***.***.***.***" : host.hostName
         var parts: [String] = []
         if !host.user.isEmpty {
-            parts.append("\(host.user)@\(host.hostName)")
+            parts.append("\(host.user)@\(displayHost)")
         } else {
-            parts.append(host.hostName)
+            parts.append(displayHost)
         }
         if let port = host.port, port != TerminalService.defaultSSHPort {
             parts.append(":\(port)")
         }
         return parts.joined()
-    }
-}
-
-// MARK: - Add Host Tile
-
-struct AddHostTile: View {
-    let action: () -> Void
-    @ObservedObject private var tm = ThemeManager.shared
-    @State private var isHovered = false
-    private var t: AppTheme { tm.current }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(t.green.opacity(isHovered ? 0.2 : 0.1))
-                        .frame(width: 34, height: 34)
-                    Image(systemName: "plus")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(t.green)
-                }
-
-                Text("Add Host")
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundColor(t.secondary)
-
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 11)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 9)
-                    .strokeBorder(
-                        style: StrokeStyle(lineWidth: 1, dash: [5, 3])
-                    )
-                    .foregroundColor(isHovered
-                        ? t.green.opacity(0.4)
-                        : t.secondary.opacity(0.3))
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
-            }
-        }
     }
 }

@@ -13,6 +13,7 @@ struct HostFormView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var host: String = ""
+    @State private var label: String = ""
     @State private var hostName: String = ""
     @State private var user: String = ""
     @State private var portString: String = ""
@@ -40,6 +41,7 @@ struct HostFormView: View {
         case .edit(let existing):
             existingID = existing.id
             _host = State(initialValue: existing.host)
+            _label = State(initialValue: existing.label)
             _hostName = State(initialValue: existing.hostName)
             _user = State(initialValue: existing.user)
             _portString = State(initialValue: existing.port.map(String.init) ?? "")
@@ -96,7 +98,8 @@ struct HostFormView: View {
                     // Connection
                     sectionHeader("Connection")
                     VStack(spacing: 10) {
-                        labeledField("Host Alias", text: $host, prompt: "e.g., myserver")
+                        labeledField("Host Alias", text: $host, prompt: "e.g., myserver (no spaces)")
+                        labeledField("Display Name", text: $label, prompt: "Optional, e.g., BDIX - Micro")
                         labeledField("HostName", text: $hostName, prompt: "IP address or domain")
                         labeledField("User", text: $user, prompt: "Username")
                         labeledField("Port", text: $portString, prompt: "22")
@@ -290,7 +293,8 @@ struct HostFormView: View {
 
         let newHost = SSHHost(
             id: existingID ?? UUID(),
-            host: host.trimmingCharacters(in: .whitespaces),
+            host: SSHConfig.sanitizeAlias(host.trimmingCharacters(in: .whitespaces)),
+            label: label.trimmingCharacters(in: .whitespaces),
             hostName: hostName.trimmingCharacters(in: .whitespaces),
             user: user.trimmingCharacters(in: .whitespaces),
             port: port,

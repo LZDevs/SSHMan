@@ -41,8 +41,16 @@ struct SSHConfig {
                 if let host = currentHost {
                     hosts.append(host)
                 }
-                currentHost = SSHHost(host: parts.value)
-                currentHost?.comment = pendingComment
+                currentHost = SSHHost(host: sanitizeAlias(parts.value))
+                // Extract @label from comment if present
+                let commentLines = pendingComment.components(separatedBy: "\n")
+                let labelLine = commentLines.first { $0.hasPrefix("# @label ") }
+                if let labelLine {
+                    currentHost?.label = String(labelLine.dropFirst("# @label ".count))
+                    currentHost?.comment = commentLines.filter { !$0.hasPrefix("# @label ") }.joined(separator: "\n")
+                } else {
+                    currentHost?.comment = pendingComment
+                }
                 pendingComment = ""
             } else if var host = currentHost {
                 applyDirective(key: key, value: parts.value, to: &host)
@@ -104,7 +112,8 @@ struct SSHConfig {
     /// Sanitize a host entry (strip control chars from fields, filter dangerous extraOptions)
     static func sanitizeHost(_ host: SSHHost) -> SSHHost {
         var h = host
-        h.host = stripControlChars(h.host)
+        h.host = sanitizeAlias(stripControlChars(h.host))
+        h.label = stripControlChars(h.label)
         h.hostName = stripControlChars(h.hostName)
         h.user = stripControlChars(h.user)
         h.identityFile = stripControlChars(h.identityFile)
@@ -129,6 +138,13 @@ struct SSHConfig {
         return h
     }
 
+    /// Replace spaces in host aliases with underscores.
+    /// SSH config treats spaces in Host directives as pattern separators,
+    /// which breaks SFTP app matching and is rarely intended.
+    static func sanitizeAlias(_ alias: String) -> String {
+        alias.replacingOccurrences(of: " ", with: "_")
+    }
+
     private static func stripControlChars(_ s: String) -> String {
         s.unicodeScalars.filter { $0.value >= 32 || $0 == "\t" }
             .map { String($0) }.joined()
@@ -141,6 +157,11 @@ struct SSHConfig {
         for (index, host) in hosts.enumerated() {
             if index > 0 {
                 lines.append("")
+            }
+
+            // Write label tag if present
+            if !host.label.isEmpty {
+                lines.append("# @label \(host.label)")
             }
 
             // Write comment if present

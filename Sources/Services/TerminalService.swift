@@ -52,14 +52,10 @@ struct TerminalService {
     }
 
     /// Open an SFTP connection in the system's preferred SFTP app via URL scheme.
-    /// Uses the SSH config alias (host.host) so apps like Transmit can match it
-    /// against ~/.ssh/config and inherit identity files, proxy settings, etc.
+    /// Uses the SSH config alias so apps like Transmit can match it against
+    /// ~/.ssh/config and inherit identity files, proxy settings, etc.
     static func openSFTP(to host: SSHHost) {
-        // SSH config's Host directive uses space-separated patterns, so use
-        // the first token as the alias — it's always a valid match pattern.
-        let alias = host.host.split(separator: " ").first.map(String.init) ?? host.host
-        guard let encoded = alias.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed),
-              let url = URL(string: "sftp://\(encoded)") else {
+        guard let url = URL(string: "sftp://\(host.host)") else {
             logger.warning("Failed to build SFTP URL for \(host.displayName)")
             return
         }

@@ -3,6 +3,7 @@ import Foundation
 struct SSHHost: Identifiable, Codable, Hashable {
     let id: UUID
     var host: String
+    var label: String
     var hostName: String
     var user: String
     var port: Int?
@@ -15,6 +16,7 @@ struct SSHHost: Identifiable, Codable, Hashable {
     init(
         id: UUID = UUID(),
         host: String = "",
+        label: String = "",
         hostName: String = "",
         user: String = "",
         port: Int? = nil,
@@ -26,6 +28,7 @@ struct SSHHost: Identifiable, Codable, Hashable {
     ) {
         self.id = id
         self.host = host
+        self.label = label
         self.hostName = hostName
         self.user = user
         self.port = port
@@ -36,9 +39,10 @@ struct SSHHost: Identifiable, Codable, Hashable {
         self.comment = comment
     }
 
-    /// The display name — uses the host alias
+    /// The display name — prefers label, falls back to host alias
     var displayName: String {
-        host.isEmpty ? hostName : host
+        if !label.isEmpty { return label }
+        return host.isEmpty ? hostName : host
     }
 
     /// Build the ssh command string for this host (shell-safe)

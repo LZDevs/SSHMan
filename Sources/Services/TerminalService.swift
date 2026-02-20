@@ -117,9 +117,10 @@ struct TerminalService {
     private static func launchTerminal(shellCommand: String, using terminal: TerminalApp, customAppPath: String = "") {
         switch terminal {
         case .ghostty:
+            // Set TERM=xterm-256color so remote servers don't need the xterm-ghostty terminfo
             launchDirectBinary(
                 binPath: TerminalApp.ghostty.appPath + "/Contents/MacOS/ghostty",
-                shellCommand: shellCommand
+                shellCommand: "TERM=xterm-256color " + shellCommand
             )
         case .terminal:
             launchViaAppleScript(

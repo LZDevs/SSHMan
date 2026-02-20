@@ -9,9 +9,9 @@
     <key>CFBundleDisplayName</key>
     <string>SSHVault</string>
     <key>CFBundleVersion</key>
-    <string>1.7.0</string>
+    <string>1.7.1</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.7.0</string>
+    <string>1.7.1</string>
     <key>CFBundleExecutable</key>
     <string>SSHVault</string>
     <key>CFBundleIconFile</key>
